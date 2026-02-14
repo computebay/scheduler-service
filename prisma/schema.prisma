@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["scheduler"]
+}
+
+model Node {
+  id                String   @id @default(uuid())
+  orgId             String
+  name              String
+  region            String?
+  status            NodeStatus @default(REGISTERED)
+
+  totalCpu          Int
+  totalMemoryMb     Int
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  lastHeartbeatAt   DateTime?
+
+  capacitySnapshots NodeCapacitySnapshot[]  // Add this relation field
+
+  @@index([orgId])
+  @@index([status])
+  @@schema("scheduler")
+}
+
+model NodeCapacitySnapshot {
+  id            String   @id @default(uuid())
+  nodeId        String
+  usedCpu       Int
+  usedMemoryMb  Int
+  recordedAt    DateTime @default(now())
+
+  node          Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId])
+  @@schema("scheduler")
+}
+
+model SchedulingAudit {
+  id          String   @id @default(uuid())
+  jobId       String
+  nodeId      String
+  decision    SchedulingDecision
+  reason      String?
+  createdAt   DateTime @default(now())
+
+  @@index([jobId])
+  @@index([nodeId])
+  @@schema("scheduler")
+}
+
+enum NodeStatus {
+  REGISTERED
+  HEALTHY
+  UNHEALTHY
+  DRAINING
+  OFFLINE
+
+  @@schema("scheduler")
+}
+
+enum SchedulingDecision {
+  SCHEDULED
+  REJECTED_NO_CAPACITY
+  REJECTED_NO_HEALTHY_NODE
+  RESCHEDULED
+
+  @@schema("scheduler")
+}

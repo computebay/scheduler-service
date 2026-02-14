@@ -1,22 +1,30 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "ES2020",
     "lib": ["ES2020"],
-    "declaration": true,
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "rootDir": "./src",
     "outDir": "./dist",
-    "rootDir": "./",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "moduleResolution": "node",
-    "allowSyntheticDefaultImports": true,
+    "allowJs": false,
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "typeRoots": ["./node_modules/@types"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "build"]
+  "include": ["src/**/*.ts", "prisma/schema.prisma"],
+  "exclude": ["node_modules", "dist"]
 }

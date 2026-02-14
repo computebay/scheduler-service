@@ -36,3 +36,4 @@ npm-debug.log*
 .env.*.prisma
 .prisma
 .env
+/src/generated/prisma
