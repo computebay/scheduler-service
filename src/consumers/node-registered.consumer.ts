@@ -6,7 +6,7 @@ import { prisma } from "@/config/db";
 export async function startNodeRegisteredConsumer() {
   const channel = getChannel();
 
-  await channel.assertQueue("scheduler.evemts", {
+  await channel.assertQueue("scheduler.events", {
     durable: true,
   });
 

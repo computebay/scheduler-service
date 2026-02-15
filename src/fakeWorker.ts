@@ -1,9 +1,12 @@
-import { getChannel } from "@/config/rabbitmq";
-import { v4 as uuidv4} from "uuid";
+import { getChannel, initRabbit } from "@/config/rabbitmq";
+import { v4 as uuidv4 } from "uuid";
 
-const nodeId =uuidv4() ;
+const nodeId = uuidv4(); // Use UUID directly as the node ID
 
 export async function startFakeWorker() {
+  // Initialize RabbitMQ first
+  await initRabbit();
+  
   const channel = getChannel();
 
   // 1️⃣ Declare worker queue
@@ -18,23 +21,25 @@ export async function startFakeWorker() {
   );
 
   // 2️⃣ Register node
+  const nodeData = {
+    nodeId,
+    orgId: "org-1",
+    name: "Fake Node 1",
+    region: "local",
+    totalCpu: 4,
+    totalMemoryMb: 8192,
+  };
+
+  console.log("Publishing node registration:", nodeData);
+
   channel.publish(
     "compute-bay.jobs",
     "node.registered",
-    Buffer.from(
-      JSON.stringify({
-        nodeId,
-        orgId: "org-1",
-        name: "Fake Node 1",
-        region: "local",
-        totalCpu: 4,
-        totalMemoryMb: 8192,
-      })
-    ),
+    Buffer.from(JSON.stringify(nodeData)),
     { persistent: true }
   );
 
-  console.log("Fake worker registered");
+  console.log("Fake worker registered with nodeId:", nodeId);
 
   // 3️⃣ Consume assigned jobs
   channel.consume(`worker.${nodeId}`, async (msg) => {
@@ -72,4 +77,4 @@ export async function startFakeWorker() {
   });
 }
 
-startFakeWorker();
+startFakeWorker().catch(console.error);

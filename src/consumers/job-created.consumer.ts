@@ -1,7 +1,7 @@
 import { getChannel } from "@/config/rabbitmq";
 import { scheduleJob } from "@/domain/scheduler.service";
 import { logger } from "../libs/logger";
-import { startFakeWorker } from "@/fakeWorker";
+
 export async function startSchedulerConsumer() {
   const channel = getChannel();
 
