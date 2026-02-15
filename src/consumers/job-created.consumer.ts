@@ -12,7 +12,7 @@ export async function startJobCreatedConsumer() {
   await channel.bindQueue(
     "scheduler.job.created",
     "compute-bay.jobs",
-    "job.created"
+    "job.job_created"
   );
 
   channel.consume("scheduler.job.created", async (msg) => {
