@@ -1,6 +1,7 @@
 import { getChannel } from "@/config/rabbitmq";
 import { clusterState } from "../domain/cluster.state";
 import { logger } from "../libs/logger";
+import { prisma } from "@/config/db";
 
 export async function startNodeHeartbeatConsumer() {
   const channel = getChannel();
@@ -15,11 +16,20 @@ export async function startNodeHeartbeatConsumer() {
     "node.heartbeat"
   );
 
-  channel.consume("scheduler.node.heartbeat", (msg) => {
+  channel.consume("scheduler.node.heartbeat", async (msg) => {
     if (!msg) return;
 
     try {
       const data = JSON.parse(msg.content.toString());
+
+      // Update lastHeartbeatAt in Node table
+      await prisma.node.update({
+        where: { id: data.nodeId },
+        data: {
+          lastHeartbeatAt: new Date(),
+          status: 'HEALTHY',
+        },
+      });
 
       clusterState.heartbeat(data.nodeId, data.usedCpu, data.usedMemoryMb);
       logger.debug({ nodeId: data.nodeId }, 'Processed node.heartbeat event');
