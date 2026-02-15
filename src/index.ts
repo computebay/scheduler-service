@@ -1,18 +1,14 @@
-// Main Entry Point
+import { initRabbit } from "@/config/rabbitmq";
+import { startConsumers } from "./consumers";
+import { logger } from "./libs/logger";
 
-export * from './consumers';
-export * from './producers/scheduler.events';
-export * from './config/db';
-export * from './config/rabbitmq';
-export * from './config/env';
-export * from './libs/prisma';
-export * from './libs/rabbit';
-export * from './libs/logger';
-export * from './domain/cluster.state';
-export * from './domain/placement.algorithm';
-export * from './domain/resource.reservation';
-export * from './domain/scheduler.service';
-export * from './types/node.types';
-export * from './types/event.types';
-export * from './utils/uuid';
-export * from './utils/time';
+async function bootstrap() {
+  await initRabbit();
+  await startConsumers();
+  logger.info("Scheduler service started");
+}
+
+bootstrap().catch((err) => {
+  logger.error("Fatal scheduler error", err);
+  process.exit(1);
+});

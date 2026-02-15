@@ -1,3 +1,5 @@
-export { JobCreatedConsumer } from './job-created.consumer';
-export { NodeHeartbeatConsumer } from './node-heartbeat.consumer';
-export { NodeRegisteredConsumer } from './node-registered.consumer';
+import { startJobCreatedConsumer } from "./job-created.consumer";
+
+export async function startConsumers() {
+  await startJobCreatedConsumer();
+}

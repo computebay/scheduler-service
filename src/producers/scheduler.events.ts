@@ -1,12 +1,21 @@
-// Scheduler Events Producer
-// Handles publishing scheduler-related events to the message queue
+import { getChannel } from "../config/rabbitmq";
 
-export class SchedulerEventsProducer {
-  async publishScheduleEvent(event: any): Promise<void> {
-    // Implementation here
-  }
+export async function publishJobScheduled(
+  jobId: string,
+  nodeId: string
+) {
+  const channel = getChannel();
 
-  async publishRescheduleEvent(event: any): Promise<void> {
-    // Implementation here
-  }
+  channel.publish(
+    "computebay",
+    "job.scheduled",
+    Buffer.from(
+      JSON.stringify({
+        jobId,
+        nodeId,
+        scheduledAt: Date.now(),
+      })
+    ),
+    { persistent: true }
+  );
 }

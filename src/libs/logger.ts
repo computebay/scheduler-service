@@ -1,9 +1,17 @@
-// Logger Library
-// Logging utilities
+import pino from "pino";
 
-export const logger = {
-  info: (message: string, meta?: any) => console.log(message, meta),
-  error: (message: string, error?: any) => console.error(message, error),
-  warn: (message: string, meta?: any) => console.warn(message, meta),
-  debug: (message: string, meta?: any) => console.debug(message, meta),
-};
+const isDev = process.env.NODE_ENV !== "production";
+
+export const logger = pino({
+  level: process.env.LOG_LEVEL || "info",
+  ...(process.env.NODE_ENV !== "production" && {
+    transport: {
+      target: "pino-pretty",
+      options: {
+        colorize: true,
+        translateTime: "SYS:standard",
+        ignore: "pid,hostname",
+      },
+    },
+  }),
+});

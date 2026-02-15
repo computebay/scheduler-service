@@ -1,14 +1,15 @@
-// Placement Algorithm
-// Implements the job placement algorithm
+import { NodeState } from "./cluster.state";
 
-export class PlacementAlgorithm {
-  placeJob(job: any, availableNodes: any[]): string {
-    // Implementation here
-    return '';
-  }
+export function leastAllocatedFit(
+  nodes: NodeState[]
+): NodeState | null {
+  if (!nodes.length) return null;
 
-  calculateBestFitNode(job: any, nodes: any[]): string {
-    // Implementation here
-    return '';
-  }
+  nodes.sort((a, b) => {
+    const aLoad = a.usedCpu / a.totalCpu;
+    const bLoad = b.usedCpu / b.totalCpu;
+    return aLoad - bLoad;
+  });
+
+  return nodes[0];
 }

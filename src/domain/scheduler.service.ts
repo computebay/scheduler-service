@@ -1,16 +1,44 @@
-// Scheduler Service
-// Core scheduling service
+import { clusterState } from "./cluster.state";
+import { leastAllocatedFit } from "./placement.algorithm";
+import { publishJobScheduled } from "../producers/scheduler.events";
+import { prisma } from "../libs/prisma";
 
-export class SchedulerService {
-  async scheduleJob(job: any): Promise<void> {
-    // Implementation here
+export async function scheduleJob(event: {
+  jobId: string;
+  orgId: string;
+  resources: { cpu: number; memory: number };
+}) {
+  const eligible = clusterState.getEligible(
+    event.resources.cpu,
+    event.resources.memory
+  );
+
+  const selected = leastAllocatedFit(eligible);
+
+  if (!selected) {
+    await prisma.schedulingAudit.create({
+      data: {
+        jobId: event.jobId,
+        nodeId: "",
+        decision: "REJECTED_NO_CAPACITY",
+      },
+    });
+    return;
   }
 
-  async rescheduleJob(jobId: string): Promise<void> {
-    // Implementation here
-  }
+  clusterState.reserve(
+    selected.nodeId,
+    event.resources.cpu,
+    event.resources.memory
+  );
 
-  async cancelJob(jobId: string): Promise<void> {
-    // Implementation here
-  }
+  await prisma.schedulingAudit.create({
+    data: {
+      jobId: event.jobId,
+      nodeId: selected.nodeId,
+      decision: "SCHEDULED",
+    },
+  });
+
+  await publishJobScheduled(event.jobId, selected.nodeId);
 }

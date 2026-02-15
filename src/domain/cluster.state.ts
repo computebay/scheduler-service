@@ -1,22 +1,46 @@
-// Cluster State
-// Manages the state of nodes in the cluster
+export interface NodeState {
+  nodeId: string;
+  totalCpu: number;
+  totalMemoryMb: number;
+  usedCpu: number;
+  usedMemoryMb: number;
+  healthy: boolean;
+  lastHeartbeat: number;
+}
 
-export class ClusterState {
-  private nodes: Map<string, any> = new Map();
+class ClusterState {
+  private nodes = new Map<string, NodeState>();
 
-  addNode(nodeId: string, nodeInfo: any): void {
-    this.nodes.set(nodeId, nodeInfo);
+  register(node: NodeState) {
+    this.nodes.set(node.nodeId, node);
   }
 
-  removeNode(nodeId: string): void {
-    this.nodes.delete(nodeId);
+  heartbeat(nodeId: string, usedCpu: number, usedMemoryMb: number) {
+    const node = this.nodes.get(nodeId);
+    if (!node) return;
+
+    node.usedCpu = usedCpu;
+    node.usedMemoryMb = usedMemoryMb;
+    node.lastHeartbeat = Date.now();
+    node.healthy = true;
   }
 
-  getNode(nodeId: string): any {
-    return this.nodes.get(nodeId);
+  getEligible(cpu: number, memory: number): NodeState[] {
+    return [...this.nodes.values()].filter(
+      (n) =>
+        n.healthy &&
+        n.totalCpu - n.usedCpu >= cpu &&
+        n.totalMemoryMb - n.usedMemoryMb >= memory
+    );
   }
 
-  getAllNodes(): any[] {
-    return Array.from(this.nodes.values());
+  reserve(nodeId: string, cpu: number, memory: number) {
+    const node = this.nodes.get(nodeId);
+    if (!node) return;
+
+    node.usedCpu += cpu;
+    node.usedMemoryMb += memory;
   }
 }
+
+export const clusterState = new ClusterState();
