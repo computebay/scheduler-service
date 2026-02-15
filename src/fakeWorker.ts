@@ -25,8 +25,8 @@ export async function startFakeWorker() {
     orgId: "org-1",
     name: "Fake Node 1",
     region: "local",
-    totalCpu: 48,
-    totalMemoryMb: 16192,
+    totalCpu: 4,
+    totalMemoryMb: 8192,
   };
 
   console.log("Publishing node registration:", nodeData);

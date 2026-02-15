@@ -16,12 +16,12 @@ export async function startSchedulerConsumer() {
     "job.created"
   );
 
-  // Bind to node.#
-  await channel.bindQueue(
-    "scheduler.events",
-    "compute-bay.jobs",
-    "node.#"
-  );
+  // // Bind to node.#
+  // await channel.bindQueue(
+  //   "scheduler.events",
+  //   "compute-bay.jobs",
+  //   "node.#"
+  // );
 
   channel.consume("scheduler.events", async (msg) => {
     if (!msg) return;
