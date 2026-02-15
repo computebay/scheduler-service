@@ -1,10 +1,9 @@
 import { getChannel, initRabbit } from "@/config/rabbitmq";
 import { v4 as uuidv4 } from "uuid";
 
-const nodeId = uuidv4(); // Use UUID directly as the node ID
+const nodeId = uuidv4();
 
 export async function startFakeWorker() {
-  // Initialize RabbitMQ first
   await initRabbit();
   
   const channel = getChannel();
@@ -26,8 +25,8 @@ export async function startFakeWorker() {
     orgId: "org-1",
     name: "Fake Node 1",
     region: "local",
-    totalCpu: 4,
-    totalMemoryMb: 8192,
+    totalCpu: 48,
+    totalMemoryMb: 16192,
   };
 
   console.log("Publishing node registration:", nodeData);
@@ -40,6 +39,17 @@ export async function startFakeWorker() {
   );
 
   console.log("Fake worker registered with nodeId:", nodeId);
+
+  // 🆕 Send periodic heartbeats
+  setInterval(() => {
+    channel.publish(
+      "compute-bay.jobs",
+      "node.heartbeat",
+      Buffer.from(JSON.stringify({ nodeId })), // ← Make sure to include nodeId
+      { persistent: true }
+    );
+    console.log("Heartbeat sent for node:", nodeId);
+  }, 30000); // Every 30 seconds
 
   // 3️⃣ Consume assigned jobs
   channel.consume(`worker.${nodeId}`, async (msg) => {
