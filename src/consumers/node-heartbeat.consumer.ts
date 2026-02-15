@@ -1,5 +1,6 @@
 import { getChannel } from "@/config/rabbitmq";
 import { clusterState } from "../domain/cluster.state";
+import { logger } from "../libs/logger";
 
 export async function startNodeHeartbeatConsumer() {
   const channel = getChannel();
@@ -17,14 +18,15 @@ export async function startNodeHeartbeatConsumer() {
   channel.consume("scheduler.node.heartbeat", (msg) => {
     if (!msg) return;
 
-    const data = JSON.parse(msg.content.toString());
+    try {
+      const data = JSON.parse(msg.content.toString());
 
-    clusterState.heartbeat(
-      data.nodeId,
-      data.usedCpu,
-      data.usedMemoryMb
-    );
+      clusterState.heartbeat(data.nodeId, data.usedCpu, data.usedMemoryMb);
+      logger.debug({ nodeId: data.nodeId }, 'Processed node.heartbeat event');
 
-    channel.ack(msg);
+      channel.ack(msg);
+    } catch (err) {
+      logger.error({ err }, 'Error processing node.heartbeat message');
+    }
   });
 }

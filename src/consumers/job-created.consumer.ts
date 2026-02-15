@@ -1,5 +1,6 @@
 import { getChannel } from "@/config/rabbitmq";
 import { scheduleJob } from "@/domain/scheduler.service";
+import { logger } from "../libs/logger";
 
 export async function startJobCreatedConsumer() {
   const channel = getChannel();
@@ -17,10 +18,16 @@ export async function startJobCreatedConsumer() {
   channel.consume("scheduler.job.created", async (msg) => {
     if (!msg) return;
 
-    const data = JSON.parse(msg.content.toString());
+    try {
+      const data = JSON.parse(msg.content.toString());
+      logger.debug({ jobId: data.jobId }, 'Received job.created event');
 
-    await scheduleJob(data);
+      await scheduleJob(data);
 
-    channel.ack(msg);
+      channel.ack(msg);
+    } catch (err) {
+      logger.error({ err }, 'Error processing job.created message');
+      // don't ack so message can be retried or moved to DLQ depending on broker setup
+    }
   });
 }

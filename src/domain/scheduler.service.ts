@@ -2,6 +2,7 @@ import { clusterState } from "./cluster.state";
 import { leastAllocatedFit } from "./placement.algorithm";
 import { publishJobScheduled } from "../producers/scheduler.events";
 import { prisma } from "@/config/db";
+import { logger } from "../libs/logger";
 
 export async function scheduleJob(event: {
   jobId: string;
@@ -13,6 +14,8 @@ export async function scheduleJob(event: {
     event.resources.memory
   );
 
+  logger.debug({ jobId: event.jobId, eligibleCount: eligible.length }, 'Found eligible nodes for scheduling');
+
   const selected = leastAllocatedFit(eligible);
 
   if (!selected) {
@@ -23,6 +26,7 @@ export async function scheduleJob(event: {
         decision: "REJECTED_NO_CAPACITY",
       },
     });
+    logger.info({ jobId: event.jobId }, 'Job rejected: no capacity');
     return;
   }
 
@@ -31,6 +35,8 @@ export async function scheduleJob(event: {
     event.resources.cpu,
     event.resources.memory
   );
+
+  logger.info({ jobId: event.jobId, nodeId: selected.nodeId }, 'Job scheduled');
 
   await prisma.schedulingAudit.create({
     data: {
