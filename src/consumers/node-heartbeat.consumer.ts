@@ -11,12 +11,12 @@ export async function startNodeHeartbeatConsumer() {
   });
 
   await channel.bindQueue(
-    "scheduler.node.heartbeat",
+    "scheduler.events",
     "compute-bay.jobs",
     "node.heartbeat"
   );
 
-  channel.consume("scheduler.node.heartbeat", async (msg) => {
+  channel.consume("scheduler.events", async (msg) => {
     if (!msg) return;
 
     try {
