@@ -5,16 +5,10 @@ export async function publishJobScheduled(
   nodeId: string
 ) {
   const channel = getChannel();
-  
-  await channel.bindQueue(
-    "scheduler.job.scheduled",
-    "compute-bay.jobs",
-    "job.job_scheduled"
-  );
-  
+
   channel.publish(
     "compute-bay.jobs",
-    "job.job_scheduled",
+    `job.scheduled.${nodeId}`,
     Buffer.from(
       JSON.stringify({
         jobId,
@@ -25,3 +19,5 @@ export async function publishJobScheduled(
     { persistent: true }
   );
 }
+
+

@@ -6,17 +6,17 @@ import { prisma } from "@/config/db";
 export async function startNodeRegisteredConsumer() {
   const channel = getChannel();
 
-  await channel.assertQueue("scheduler.node.registered", {
+  await channel.assertQueue("scheduler.evemts", {
     durable: true,
   });
 
   await channel.bindQueue(
-    "scheduler.node.registered",
+    "scheduler.events",
     "compute-bay.jobs",
     "node.registered"
   );
 
-  channel.consume("scheduler.node.registered", async (msg) => {
+  channel.consume("scheduler.events", async (msg) => {
     if (!msg) return;
 
     try {
