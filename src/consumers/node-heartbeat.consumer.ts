@@ -1,49 +1,37 @@
-import { getChannel } from "@/config/rabbitmq";
 import { clusterState } from "../domain/cluster.state";
 import { logger } from "../libs/logger";
 import { prisma } from "@/config/db";
 
-export async function startNodeHeartbeatConsumer() {
-  const channel = getChannel();
+/** Process a node.heartbeat message payload. Called by the single scheduler.events consumer. */
+export async function processNodeHeartbeat(data: Record<string, unknown>): Promise<void> {
+  const nodeId = (data.nodeId ?? data.id) as string | undefined;
+  if (!nodeId || typeof nodeId !== "string") {
+    logger.warn({ data, keys: Object.keys(data || {}) }, "node.heartbeat missing nodeId/id – skipping");
+    return;
+  }
 
-  await channel.assertQueue("scheduler.events", {
-    durable: true,
-  });
+  try {
+    await prisma.node.update({
+      where: { id: nodeId },
+      data: {
+        lastHeartbeatAt: new Date(),
+        status: "HEALTHY",
+      },
+    });
+  } catch {
+    // Node may not exist yet (e.g. heartbeat before register)
+    logger.debug({ nodeId }, "node.heartbeat: node not in DB, skipping DB update");
+  }
 
-  await channel.bindQueue(
-    "scheduler.events",
-    "compute-bay.jobs",
-    "node.heartbeat"
+  clusterState.heartbeat(
+    nodeId,
+    Number(data.usedCpu) || 0,
+    Number(data.usedMemoryMb) || 0
   );
+  logger.debug({ nodeId }, "Processed node.heartbeat event");
+}
 
-  channel.consume("scheduler.events", async (msg) => {
-    if (!msg) return;
-
-    try {
-      const data = JSON.parse(msg.content.toString());
-      const nodeId = data.nodeId ?? data.id;
-
-      if (!nodeId || typeof nodeId !== 'string') {
-        logger.warn({ data, keys: Object.keys(data || {}) }, 'node.heartbeat missing nodeId/id – skipping');
-        channel.ack(msg);
-        return;
-      }
-
-      // Update lastHeartbeatAt in Node table
-      await prisma.node.update({
-        where: { id: nodeId },
-        data: {
-          lastHeartbeatAt: new Date(),
-          status: 'HEALTHY',
-        },
-      });
-
-      clusterState.heartbeat(nodeId, data.usedCpu ?? 0, data.usedMemoryMb ?? 0);
-      logger.debug({ nodeId }, 'Processed node.heartbeat event');
-
-      channel.ack(msg);
-    } catch (err) {
-      logger.error({ err }, 'Error processing node.heartbeat message');
-    }
-  });
+/** No-op: bindings and consume are done in job-created.consumer (single consumer). */
+export async function startNodeHeartbeatConsumer() {
+  // Queue binding and consumption are in startSchedulerConsumer()
 }

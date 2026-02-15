@@ -1,5 +1,7 @@
 import { getChannel } from "@/config/rabbitmq";
 import { scheduleJob } from "@/domain/scheduler.service";
+import { processNodeHeartbeat } from "@/consumers/node-heartbeat.consumer";
+import { processNodeRegistered } from "@/consumers/node-registered.consumer";
 import { logger } from "../libs/logger";
 
 export async function startSchedulerConsumer() {
@@ -9,34 +11,25 @@ export async function startSchedulerConsumer() {
     durable: true,
   });
 
-  // Bind to job.created
-  await channel.bindQueue(
-    "scheduler.events",
-    "compute-bay.jobs",
-    "job.created"
-  );
-
-  // // Bind to node.#
-  // await channel.bindQueue(
-  //   "scheduler.events",
-  //   "compute-bay.jobs",
-  //   "node.#"
-  // );
+  await channel.bindQueue("scheduler.events", "compute-bay.jobs", "job.created");
+  await channel.bindQueue("scheduler.events", "compute-bay.jobs", "node.registered");
+  await channel.bindQueue("scheduler.events", "compute-bay.jobs", "node.heartbeat");
 
   channel.consume("scheduler.events", async (msg) => {
     if (!msg) return;
 
     try {
       const routingKey = msg.fields.routingKey;
-      const data = JSON.parse(msg.content.toString());
+      const data = JSON.parse(msg.content.toString()) as Record<string, unknown>;
 
       if (routingKey === "job.created") {
         logger.debug({ jobId: data.jobId }, "Received job.created");
-        await scheduleJob(data);
+        await scheduleJob(data as { jobId: string; orgId: string; resources: { cpu: number; memoryMB: number } });
+      } else if (routingKey === "node.registered") {
+        await processNodeRegistered(data);
+      } else if (routingKey === "node.heartbeat") {
+        await processNodeHeartbeat(data);
       }
-
-      // Later:
-      // if (routingKey.startsWith("node.")) { ... }
 
       channel.ack(msg);
     } catch (err) {
@@ -44,7 +37,5 @@ export async function startSchedulerConsumer() {
       // do NOT ack on failure
     }
   });
-
-  // startFakeWorker()
 }
 
