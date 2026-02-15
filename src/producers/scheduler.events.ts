@@ -7,7 +7,7 @@ export async function publishJobScheduled(
   const channel = getChannel();
 
   channel.publish(
-    "computebay",
+    "compute-bay.jobs",
     "job.scheduled",
     Buffer.from(
       JSON.stringify({

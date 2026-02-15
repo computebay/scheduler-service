@@ -11,7 +11,7 @@ export async function startNodeHeartbeatConsumer() {
 
   await channel.bindQueue(
     "scheduler.node.heartbeat",
-    "computebay",
+    "compute-bay.jobs",
     "node.heartbeat"
   );
 

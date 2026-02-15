@@ -11,7 +11,7 @@ export async function startNodeRegisteredConsumer() {
 
   await channel.bindQueue(
     "scheduler.node.registered",
-    "computebay",
+    "compute-bay.jobs",
     "node.registered"
   );
 
