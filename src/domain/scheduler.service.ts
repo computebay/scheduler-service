@@ -7,11 +7,11 @@ import { logger } from "../libs/logger";
 export async function scheduleJob(event: {
   jobId: string;
   orgId: string;
-  resources: { cpu: number; memory: number };
+  resources: { cpu: number; memoryMB: number };
 }) {
   const eligible = clusterState.getEligible(
     event.resources.cpu,
-    event.resources.memory
+    event.resources.memoryMB
   );
 
   logger.debug({ jobId: event.jobId, eligibleCount: eligible.length }, 'Found eligible nodes for scheduling');
@@ -33,7 +33,7 @@ export async function scheduleJob(event: {
   clusterState.reserve(
     selected.nodeId,
     event.resources.cpu,
-    event.resources.memory
+    event.resources.memoryMB
   );
 
   logger.info({ jobId: event.jobId, nodeId: selected.nodeId }, 'Job scheduled');

@@ -19,6 +19,7 @@ export async function startJobCreatedConsumer() {
     if (!msg) return;
 
     try {
+      
       const data = JSON.parse(msg.content.toString());
       logger.debug({ jobId: data.jobId }, 'Received job.created event');
 
