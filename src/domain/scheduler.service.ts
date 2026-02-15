@@ -1,7 +1,7 @@
 import { clusterState } from "./cluster.state";
 import { leastAllocatedFit } from "./placement.algorithm";
 import { publishJobScheduled } from "../producers/scheduler.events";
-import { prisma } from "../libs/prisma";
+import { prisma } from "@/config/db";
 
 export async function scheduleJob(event: {
   jobId: string;
