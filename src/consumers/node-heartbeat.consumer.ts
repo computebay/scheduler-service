@@ -6,7 +6,7 @@ import { prisma } from "@/config/db";
 export async function startNodeHeartbeatConsumer() {
   const channel = getChannel();
 
-  await channel.assertQueue("scheduler.node.heartbeat", {
+  await channel.assertQueue("scheduler.events", {
     durable: true,
   });
 
@@ -21,18 +21,25 @@ export async function startNodeHeartbeatConsumer() {
 
     try {
       const data = JSON.parse(msg.content.toString());
+      const nodeId = data.nodeId ?? data.id;
+
+      if (!nodeId || typeof nodeId !== 'string') {
+        logger.warn({ data, keys: Object.keys(data || {}) }, 'node.heartbeat missing nodeId/id – skipping');
+        channel.ack(msg);
+        return;
+      }
 
       // Update lastHeartbeatAt in Node table
       await prisma.node.update({
-        where: { id: data.nodeId },
+        where: { id: nodeId },
         data: {
           lastHeartbeatAt: new Date(),
           status: 'HEALTHY',
         },
       });
 
-      clusterState.heartbeat(data.nodeId, data.usedCpu, data.usedMemoryMb);
-      logger.debug({ nodeId: data.nodeId }, 'Processed node.heartbeat event');
+      clusterState.heartbeat(nodeId, data.usedCpu ?? 0, data.usedMemoryMb ?? 0);
+      logger.debug({ nodeId }, 'Processed node.heartbeat event');
 
       channel.ack(msg);
     } catch (err) {

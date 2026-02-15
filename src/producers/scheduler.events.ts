@@ -1,5 +1,6 @@
 import { getChannel } from "../config/rabbitmq";
 
+/** Publishes with routing key `job.scheduled.${nodeId}`. For job-service to receive these, bind its queue to exchange "compute-bay.jobs" with pattern `job.scheduled.#`. */
 export async function publishJobScheduled(
   jobId: string,
   nodeId: string

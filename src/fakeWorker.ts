@@ -22,7 +22,7 @@ export async function startFakeWorker() {
   // 2️⃣ Register node
   const nodeData = {
     nodeId,
-    orgId: "org-1",
+    orgId: "org-123",
     name: "Fake Node 1",
     region: "local",
     totalCpu: 4,
