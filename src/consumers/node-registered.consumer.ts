@@ -3,10 +3,15 @@ import { logger } from "../libs/logger";
 import { prisma } from "@/config/db";
 
 /** Process a node.registered message payload. Called by the single scheduler.events consumer. */
-export async function processNodeRegistered(data: Record<string, unknown>): Promise<void> {
+export async function processNodeRegistered(
+  data: Record<string, unknown>,
+): Promise<void> {
   const nodeId = (data.nodeId ?? data.id) as string | undefined;
   if (!nodeId || typeof nodeId !== "string") {
-    logger.warn({ data, keys: Object.keys(data || {}) }, "node.registered missing nodeId/id – skipping");
+    logger.warn(
+      { data, keys: Object.keys(data || {}) },
+      "node.registered missing nodeId/id – skipping",
+    );
     return;
   }
 
@@ -49,10 +54,16 @@ export async function processNodeRegistered(data: Record<string, unknown>): Prom
         healthy: true,
         lastHeartbeat: Date.now(),
       });
-      logger.debug({ nodeId }, "Node re-registered (update only, no orgId in payload)");
+      logger.debug(
+        { nodeId },
+        "Node re-registered (update only, no orgId in payload)",
+      );
       return;
     }
-    logger.warn({ nodeId, data }, "node.registered missing orgId and node not in DB – skipping");
+    logger.warn(
+      { nodeId, data },
+      "node.registered missing orgId and node not in DB – skipping",
+    );
     return;
   }
 

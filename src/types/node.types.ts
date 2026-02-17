@@ -5,7 +5,7 @@ export interface INode {
   hostname: string;
   cpuCores: number;
   memoryMb: number;
-  status: 'healthy' | 'unhealthy';
+  status: "healthy" | "unhealthy";
   lastHeartbeat: Date;
 }
 

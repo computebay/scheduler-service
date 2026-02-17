@@ -1,9 +1,9 @@
 import amqp from "amqplib";
-import {logger} from '@/libs/logger'
+import { logger } from "@/libs/logger";
 let channel: amqp.Channel;
 
 export async function initRabbit() {
-  logger.info('Connecting to RabbitMQ');
+  logger.info("Connecting to RabbitMQ");
   const conn = await amqp.connect(Bun.env.RABBITMQ_URL!);
   channel = await conn.createChannel();
 
@@ -11,7 +11,7 @@ export async function initRabbit() {
     durable: true,
   });
 
-  logger.info('RabbitMQ connected');
+  logger.info("RabbitMQ connected");
 }
 
 export function getChannel() {

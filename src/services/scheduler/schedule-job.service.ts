@@ -4,6 +4,6 @@
 export class ScheduleJobService {
   async executeSchedule(job: any): Promise<string> {
     // Implementation here
-    return '';
+    return "";
   }
 }

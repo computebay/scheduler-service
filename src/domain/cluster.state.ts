@@ -30,7 +30,7 @@ class ClusterState {
       (n) =>
         n.healthy &&
         n.totalCpu - n.usedCpu >= cpu &&
-        n.totalMemoryMb - n.usedMemoryMb >= memory
+        n.totalMemoryMb - n.usedMemoryMb >= memory,
     );
   }
 

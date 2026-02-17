@@ -17,12 +17,12 @@ export async function scheduleJob(event: {
   try {
     const eligible = clusterState.getEligible(
       event.resources.cpu,
-      event.resources.memoryMB
+      event.resources.memoryMB,
     );
 
     logger.debug(
       { jobId: event.jobId, eligibleCount: eligible.length },
-      "Found eligible nodes for scheduling"
+      "Found eligible nodes for scheduling",
     );
 
     const selected = leastAllocatedFit(eligible);
@@ -42,10 +42,13 @@ export async function scheduleJob(event: {
     clusterState.reserve(
       selected.nodeId,
       event.resources.cpu,
-      event.resources.memoryMB
+      event.resources.memoryMB,
     );
 
-    logger.info({ jobId: event.jobId, nodeId: selected.nodeId }, "Job scheduled");
+    logger.info(
+      { jobId: event.jobId, nodeId: selected.nodeId },
+      "Job scheduled",
+    );
 
     await prisma.schedulingAudit.create({
       data: {

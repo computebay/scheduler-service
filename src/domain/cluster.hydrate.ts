@@ -23,7 +23,10 @@ export async function hydrateClusterFromDb(): Promise<void> {
     }
 
     if (nodes.length > 0) {
-      logger.info({ count: nodes.length, clusterSize: clusterState.size() }, "Hydrated cluster state from DB");
+      logger.info(
+        { count: nodes.length, clusterSize: clusterState.size() },
+        "Hydrated cluster state from DB",
+      );
     }
   } catch (err) {
     logger.error({ err }, "Failed to hydrate cluster state from DB");

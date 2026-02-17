@@ -1,8 +1,6 @@
 import { NodeState } from "./cluster.state";
 
-export function leastAllocatedFit(
-  nodes: NodeState[]
-): NodeState | null {
+export function leastAllocatedFit(nodes: NodeState[]): NodeState | null {
   if (!nodes.length) return null;
 
   nodes.sort((a, b) => {

@@ -5,10 +5,10 @@ const nodeId = uuidv4();
 
 export async function startFakeWorker() {
   await initRabbit();
-  
+
   const channel = getChannel();
 
-  // 1️⃣ Declare worker queue
+  // Declare worker queue
   await channel.assertQueue(`worker.${nodeId}`, {
     durable: true,
   });
@@ -16,7 +16,7 @@ export async function startFakeWorker() {
   await channel.bindQueue(
     `worker.${nodeId}`,
     "compute-bay.jobs",
-    `job.scheduled.${nodeId}`
+    `job.scheduled.${nodeId}`,
   );
 
   // 2️⃣ Register node
@@ -35,7 +35,7 @@ export async function startFakeWorker() {
     "compute-bay.jobs",
     "node.registered",
     Buffer.from(JSON.stringify(nodeData)),
-    { persistent: true }
+    { persistent: true },
   );
 
   console.log("Fake worker registered with nodeId:", nodeId);
@@ -46,7 +46,7 @@ export async function startFakeWorker() {
       "compute-bay.jobs",
       "node.heartbeat",
       Buffer.from(JSON.stringify({ nodeId })), // ← Make sure to include nodeId
-      { persistent: true }
+      { persistent: true },
     );
     console.log("Heartbeat sent for node:", nodeId);
   }, 30000); // Every 30 seconds
@@ -64,7 +64,7 @@ export async function startFakeWorker() {
         "compute-bay.jobs",
         "job.started",
         Buffer.from(JSON.stringify({ jobId: data.jobId })),
-        { persistent: true }
+        { persistent: true },
       );
 
       setTimeout(() => {
@@ -75,9 +75,9 @@ export async function startFakeWorker() {
             JSON.stringify({
               jobId: data.jobId,
               exitCode: 0,
-            })
+            }),
           ),
-          { persistent: true }
+          { persistent: true },
         );
 
         channel.ack(msg);

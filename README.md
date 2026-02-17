@@ -33,21 +33,25 @@ The service is organized into:
 ## Setup
 
 1. Install dependencies:
+
 ```bash
 bun install
 ```
 
 2. Configure environment variables:
+
 ```bash
 cp .env.example .env
 ```
 
 3. Setup database:
+
 ```bash
 bun run prisma:migrate
 ```
 
 4. Start the service:
+
 ```bash
 bun run dev
 ```
