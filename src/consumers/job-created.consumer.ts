@@ -31,6 +31,8 @@ export async function startSchedulerConsumer() {
         await processNodeHeartbeat(data);
       }
 
+      
+
       channel.ack(msg);
     } catch (err) {
       logger.error({ err }, "Error processing scheduler event");
