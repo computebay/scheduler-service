@@ -10,7 +10,8 @@ export async function startSchedulerConsumer() {
   await channel.assertQueue("scheduler.events", {
     durable: true,
   });
-
+  //bind all queues over here
+  
   await channel.bindQueue(
     "scheduler.events",
     "compute-bay.jobs",

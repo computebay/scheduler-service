@@ -64,7 +64,7 @@ export async function scheduleJob(event: {
   }
 }
 
-function acquireSchedulingLock(): Promise<() => void> {
+async function acquireSchedulingLock(): Promise<() => void> {
   const prev = schedulingLock;
   let release: () => void;
   schedulingLock = new Promise<void>((resolve) => {
