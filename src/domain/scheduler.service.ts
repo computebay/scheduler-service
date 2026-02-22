@@ -7,21 +7,25 @@ import { logger } from "../libs/logger";
 /** Ensures only one job runs "getEligible + reserve" at a time so we don't over-assign the same node. */
 let schedulingLock: Promise<void> = Promise.resolve();
 
-export async function scheduleJob(event: {
+export interface JobCreatedEvent {
   jobId: string;
   orgId: string;
   resources: { cpu: number; memoryMB: number };
-}) {
+  [key: string]: unknown;
+}
+
+export async function scheduleJob(event: JobCreatedEvent) {
   const release = await acquireSchedulingLock();
+  const { jobId, resources } = event;
 
   try {
     const eligible = clusterState.getEligible(
-      event.resources.cpu,
-      event.resources.memoryMB,
+      resources.cpu,
+      resources.memoryMB,
     );
 
     logger.debug(
-      { jobId: event.jobId, eligibleCount: eligible.length },
+      { jobId, eligibleCount: eligible.length },
       "Found eligible nodes for scheduling",
     );
 
@@ -30,12 +34,12 @@ export async function scheduleJob(event: {
     if (!selected) {
       await prisma.schedulingAudit.create({
         data: {
-          jobId: event.jobId,
+          jobId,
           nodeId: "",
           decision: "REJECTED_NO_CAPACITY",
         },
       });
-      logger.info({ jobId: event.jobId }, "Job rejected: no capacity");
+      logger.info({ jobId }, "Job rejected: no capacity");
       return;
     }
 
@@ -46,19 +50,19 @@ export async function scheduleJob(event: {
     );
 
     logger.info(
-      { jobId: event.jobId, nodeId: selected.nodeId },
+      { jobId, nodeId: selected.nodeId },
       "Job scheduled",
     );
 
     await prisma.schedulingAudit.create({
       data: {
-        jobId: event.jobId,
+        jobId,
         nodeId: selected.nodeId,
         decision: "SCHEDULED",
       },
     });
 
-    await publishJobScheduled(event.jobId, selected.nodeId);
+    await publishJobScheduled(event, selected.nodeId);
   } finally {
     release();
   }

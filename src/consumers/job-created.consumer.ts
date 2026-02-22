@@ -29,13 +29,7 @@ export async function startSchedulerConsumer() {
 
       if (routingKey === "job.created") {
         logger.debug({ jobId: data.jobId }, "Received job.created");
-        await scheduleJob(
-          data as {
-            jobId: string;
-            orgId: string;
-            resources: { cpu: number; memoryMB: number };
-          },
-        );
+        await scheduleJob(data as Parameters<typeof scheduleJob>[0]);
       } else if (
         routingKey === "node.registration.requested" ||
         routingKey === "node.registered"
