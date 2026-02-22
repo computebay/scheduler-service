@@ -25,6 +25,11 @@ class ClusterState {
     node.healthy = true;
   }
 
+  markUnhealthy(nodeId: string) {
+    const node = this.nodes.get(nodeId);
+    if (node) node.healthy = false;
+  }
+
   getEligible(cpu: number, memory: number): NodeState[] {
     return [...this.nodes.values()].filter(
       (n) =>
