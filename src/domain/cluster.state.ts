@@ -42,6 +42,14 @@ class ClusterState {
     node.usedMemoryMb += memory;
   }
 
+  release(nodeId: string, cpu: number, memory: number) {
+    const node = this.nodes.get(nodeId);
+    if (!node) return;
+
+    node.usedCpu = Math.max(0, node.usedCpu - cpu);
+    node.usedMemoryMb = Math.max(0, node.usedMemoryMb - memory);
+  }
+
   /** Number of nodes currently in memory (for debugging / startup hydration). */
   size(): number {
     return this.nodes.size;

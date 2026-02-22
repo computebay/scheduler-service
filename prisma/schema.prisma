@@ -9,21 +9,23 @@ datasource db {
 }
 
 model Node {
-  id                String   @id @default(uuid())
-  orgId             String
-  name              String
-  region            String?
-  status            NodeStatus @default(REGISTERED)
+  id                  String     @id
+  orgId               String?    // Set by dashboard on pairing; "unpaired" for PENDING
+  name                String?
+  region              String?
+  status              NodeStatus @default(REGISTERED)
+  publicKey           String?    // Required after registration; never overwrite unless revoked
 
-  totalCpu          Int
-  totalMemoryMb     Int
+  totalCpu            Int
+  totalMemoryMb       Int
+  allocatableCpu      Int?       // From registration; used for scheduling
+  allocatableMemoryMb Int?
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  lastHeartbeatAt     DateTime?
 
-  lastHeartbeatAt   DateTime?
-
-  capacitySnapshots NodeCapacitySnapshot[]  // Add this relation field
+  capacitySnapshots   NodeCapacitySnapshot[]
 
   @@index([orgId])
   @@index([status])

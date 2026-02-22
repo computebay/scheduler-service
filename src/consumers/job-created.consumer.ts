@@ -10,33 +10,22 @@ export async function startSchedulerConsumer() {
   await channel.assertQueue("scheduler.events", {
     durable: true,
   });
-  //bind all queues over here
-  
+
+  await channel.bindQueue("scheduler.events", "compute-bay.jobs", "job.created");
   await channel.bindQueue(
     "scheduler.events",
     "compute-bay.jobs",
-    "job.created",
+    "node.registration.requested",
   );
-  await channel.bindQueue(
-    "scheduler.events",
-    "compute-bay.jobs",
-    "node.registered",
-  );
-  await channel.bindQueue(
-    "scheduler.events",
-    "compute-bay.jobs",
-    "node.heartbeat",
-  );
+  await channel.bindQueue("scheduler.events", "compute-bay.jobs", "node.registered");
+  await channel.bindQueue("scheduler.events", "compute-bay.jobs", "node.heartbeat");
 
   channel.consume("scheduler.events", async (msg) => {
     if (!msg) return;
 
     try {
-      const routingKey = msg.fields.routingKey;
-      const data = JSON.parse(msg.content.toString()) as Record<
-        string,
-        unknown
-      >;
+      const routingKey = msg.fields.routingKey as string;
+      const data = JSON.parse(msg.content.toString()) as Record<string, unknown>;
 
       if (routingKey === "job.created") {
         logger.debug({ jobId: data.jobId }, "Received job.created");
@@ -47,7 +36,10 @@ export async function startSchedulerConsumer() {
             resources: { cpu: number; memoryMB: number };
           },
         );
-      } else if (routingKey === "node.registered") {
+      } else if (
+        routingKey === "node.registration.requested" ||
+        routingKey === "node.registered"
+      ) {
         await processNodeRegistered(data);
       } else if (routingKey === "node.heartbeat") {
         await processNodeHeartbeat(data);
@@ -56,7 +48,6 @@ export async function startSchedulerConsumer() {
       channel.ack(msg);
     } catch (err) {
       logger.error({ err }, "Error processing scheduler event");
-      // do NOT ack on failure
     }
   });
 }

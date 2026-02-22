@@ -7,14 +7,16 @@ export async function hydrateClusterFromDb(): Promise<void> {
   try {
     const nodes = await prisma.node.findMany({
       where: { status: { in: ["REGISTERED", "HEALTHY"] } },
-      select: { id: true, totalCpu: true, totalMemoryMb: true },
+      select: { id: true, totalCpu: true, totalMemoryMb: true, allocatableCpu: true, allocatableMemoryMb: true },
     });
 
     for (const node of nodes) {
+      const cpu = node.allocatableCpu ?? node.totalCpu;
+      const memory = node.allocatableMemoryMb ?? node.totalMemoryMb;
       clusterState.register({
         nodeId: node.id,
-        totalCpu: node.totalCpu,
-        totalMemoryMb: node.totalMemoryMb,
+        totalCpu: cpu,
+        totalMemoryMb: memory,
         usedCpu: 0,
         usedMemoryMb: 0,
         healthy: true,

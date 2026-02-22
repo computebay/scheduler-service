@@ -1,8 +1,12 @@
 import { clusterState } from "../domain/cluster.state";
 import { logger } from "../libs/logger";
 import { prisma } from "@/config/db";
+import { verifyWorkerMessage } from "../security/signature.verify";
 
-/** Process a node.heartbeat message payload. Called by the single scheduler.events consumer. */
+/**
+ * Process node.heartbeat.
+ * Verifies signature with stored publicKey, then updates heartbeat and cluster state.
+ */
 export async function processNodeHeartbeat(
   data: Record<string, unknown>,
 ): Promise<void> {
@@ -10,36 +14,40 @@ export async function processNodeHeartbeat(
   if (!nodeId || typeof nodeId !== "string") {
     logger.warn(
       { data, keys: Object.keys(data || {}) },
-      "node.heartbeat missing nodeId/id – skipping",
+      "node.heartbeat missing nodeId – skipping",
     );
     return;
   }
 
-  try {
-    await prisma.node.update({
-      where: { id: nodeId },
-      data: {
-        lastHeartbeatAt: new Date(),
-        status: "HEALTHY",
-      },
-    });
-  } catch {
-    // Node may not exist yet (e.g. heartbeat before register)
-    logger.debug(
-      { nodeId },
-      "node.heartbeat: node not in DB, skipping DB update",
-    );
+  const node = await prisma.node.findUnique({
+    where: { id: nodeId },
+    select: { publicKey: true },
+  });
+
+  if (!node) {
+    logger.warn({ nodeId }, "node.heartbeat: node not in DB – skipping");
+    return;
   }
+
+  // If node has publicKey, verify signature
+  if (node.publicKey && data.signature) {
+    const valid = await verifyWorkerMessage(nodeId, data);
+    if (!valid) return;
+  }
+
+  await prisma.node.update({
+    where: { id: nodeId },
+    data: {
+      lastHeartbeatAt: new Date(),
+      status: "HEALTHY",
+    },
+  });
 
   clusterState.heartbeat(
     nodeId,
     Number(data.usedCpu) || 0,
     Number(data.usedMemoryMb) || 0,
   );
-  logger.debug({ nodeId }, "Processed node.heartbeat event");
-}
 
-/** No-op: bindings and consume are done in job-created.consumer (single consumer). */
-export async function startNodeHeartbeatConsumer() {
-  // Queue binding and consumption are in startSchedulerConsumer()
+  logger.debug({ nodeId }, "Processed node.heartbeat");
 }
