@@ -11,6 +11,9 @@ export async function initRabbit() {
     durable: true,
   });
 
+  // Exchange for node-scoped worker events (used by public worker agents).
+  await channel.assertExchange("node.events", "topic", { durable: true });
+
   logger.info("RabbitMQ connected");
 }
 
