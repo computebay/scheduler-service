@@ -11,8 +11,10 @@ export async function publishJobScheduled(event: JobCreatedEvent, nodeId: string
     scheduledAt: Date.now(),
   };
 
+  const queue = `queue.node.${nodeId}`;
+  await channel.assertQueue(queue, { durable: true });
   channel.sendToQueue(
-    `queue.node.${nodeId}`,
+    queue,
     Buffer.from(JSON.stringify(payload)),
     { persistent: true },
   );

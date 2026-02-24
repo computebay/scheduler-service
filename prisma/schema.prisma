@@ -15,6 +15,8 @@ model Node {
   region              String?
   status              NodeStatus @default(REGISTERED)
   publicKey           String?    // Required after registration; never overwrite unless revoked
+  machineId           String?
+  agentVersion        String?
 
   totalCpu            Int
   totalMemoryMb       Int
@@ -29,6 +31,7 @@ model Node {
 
   @@index([orgId])
   @@index([status])
+  @@index([machineId])
   @@schema("scheduler")
 }
 
