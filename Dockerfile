@@ -23,7 +23,7 @@ ENV NODE_ENV=production
 ENV PORT=8000
 
 # Copy dependency definitions and install production-only dependencies
-COPY package.json bun.lockb ./
+COPY package.json bun.lock ./
 RUN bun install --production --frozen-lockfile
 
 # Copy generated Prisma Client and artifacts from builder stage
