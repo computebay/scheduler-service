@@ -1,12 +1,26 @@
+# Dependencies
 node_modules
-npm-debug.log
-dist
-build
+bun.lockb
+
+# Development / Configuration
+.env
+.env.*
 .git
 .gitignore
-.env.local
-.env.*.local
-README.md
-.DS_Store
+.dockerignore
+Dockerfile
+docker-compose.yml
+docker-entrypoint.sh
+
+# Build & Test Artifacts
+dist
+build
 coverage
 .nyc_output
+npm-debug.log
+
+# System / IDEs
+.DS_Store
+.vscode
+.idea
+*.log

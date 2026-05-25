@@ -1,23 +1,43 @@
-# Build stage
-FROM oven/bun:latest AS build
+# Stage 1: Build & Generate Prisma Client
+FROM oven/bun:latest AS builder
 
 WORKDIR /app
 
+# Copy dependency definitions
 COPY package.json bun.lockb ./
-RUN bun install --production
 
-COPY . .
-RUN bun run build
+# Install all dependencies (including devDependencies to get prisma CLI)
+RUN bun install --frozen-lockfile
 
-# Runtime stage
-FROM oven/bun:latest
+# Copy prisma directory and generate client
+COPY prisma ./prisma
+RUN bun run prisma:generate
+
+# Stage 2: Runtime Stage
+FROM oven/bun:latest AS runner
 
 WORKDIR /app
 
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/dist ./dist
-COPY package.json .env* ./
+# Set default environment variables
+ENV NODE_ENV=production
+ENV PORT=8000
 
-EXPOSE 3000
+# Copy dependency definitions and install production-only dependencies
+COPY package.json bun.lockb ./
+RUN bun install --production --frozen-lockfile
 
-CMD ["bun", "run", "dist/src/index.js"]
+# Copy generated Prisma Client and artifacts from builder stage
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
+
+# Copy application source and files
+COPY src ./src
+COPY tsconfig.json ./
+COPY prisma ./prisma
+COPY docker-entrypoint.sh ./
+
+# Expose port (default 8000)
+EXPOSE 8000
+
+# Set entrypoint to custom startup script
+ENTRYPOINT ["./docker-entrypoint.sh"]
