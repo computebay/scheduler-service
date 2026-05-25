@@ -1,6 +1,5 @@
 # Dependencies
 node_modules
-bun.lockb
 
 # Development / Configuration
 .env
@@ -10,7 +9,6 @@ bun.lockb
 .dockerignore
 Dockerfile
 docker-compose.yml
-docker-entrypoint.sh
 
 # Build & Test Artifacts
 dist
