@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.4.0",
-    "@prisma/client": "^7.4.0",
+    "@prisma/client": "^7.4.2",
     "@types/amqplib": "^0.10.8",
     "@types/cors": "^2.8.19",
     "@types/pg": "^8.16.0",
