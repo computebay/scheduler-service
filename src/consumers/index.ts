@@ -1,6 +1,8 @@
 import { startSchedulerConsumer } from "./job-created.consumer";
 import { hydrateClusterFromDb } from "@/domain/cluster.hydrate";
-import { logger } from "../libs/logger";
+import { getLogger } from "@computebay/observability";
+
+const logger = getLogger();
 
 export async function startConsumers() {
   await hydrateClusterFromDb();

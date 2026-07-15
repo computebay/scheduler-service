@@ -2,11 +2,13 @@ import { prisma } from "@/config/db";
 import { env } from "@/config/env";
 import { getChannel } from "@/config/rabbitmq";
 import { clusterState } from "@/domain/cluster.state";
-import { logger } from "@/libs/logger";
+import { getLogger, instrumentedQuery } from "@computebay/observability";
 import { setRabbitMqPermissions, upsertRabbitMqUser } from "@/integrations/rabbitmq/rabbitmq-management";
 import { randomBytes } from "node:crypto";
 import { v4 as uuidv4 } from "uuid";
 import { publishNodeRegistered } from "@/producers/scheduler.events";
+
+const logger = getLogger();
 
 type RegisterNodeInput = {
   machineId: string;
@@ -39,22 +41,23 @@ export const nodesService = {
   async register(input: RegisterNodeInput) {
     const nodeId = uuidv4();
 
-    // Persist node first (keeps scheduler's DB as source of truth).
-    await prisma.node.create({
-      data: {
-        id: nodeId,
-        orgId: "default",
-        name: input.machineId,
-        status: "REGISTERED",
-        machineId: input.machineId,
-        agentVersion: input.agentVersion,
-        totalCpu: input.cpuCores,
-        totalMemoryMb: input.memoryMB,
-        allocatableCpu: input.cpuCores,
-        allocatableMemoryMb: input.memoryMB,
-        lastHeartbeatAt: new Date(),
-      },
-    });
+    await instrumentedQuery("INSERT", "nodes", "scheduler-service", () =>
+      prisma.node.create({
+        data: {
+          id: nodeId,
+          orgId: "default",
+          name: input.machineId,
+          status: "REGISTERED",
+          machineId: input.machineId,
+          agentVersion: input.agentVersion,
+          totalCpu: input.cpuCores,
+          totalMemoryMb: input.memoryMB,
+          allocatableCpu: input.cpuCores,
+          allocatableMemoryMb: input.memoryMB,
+          lastHeartbeatAt: new Date(),
+        },
+      }),
+    );
 
     const queue = `queue.node.${nodeId}`;
     const eventsExchange = `node.${nodeId}.events`;
@@ -70,13 +73,11 @@ export const nodesService = {
     await upsertRabbitMqUser(username, password);
     await setRabbitMqPermissions(username, env.rabbitmq.vhost || "/", {
       configure: "",
-      // RabbitMQ permissions apply to exchange/queue names (not routing keys).
-      // Allow publishing to the shared exchange and (optionally) a per-node exchange.
       write: `^(node\\.events|node\\.${nodeId}\\.events)$`,
       read: `^queue\\.node\\.${nodeId}$`,
     });
 
-    // Make node schedulable immediately (no scheduling logic moved).
+    // Make node schedulable immediately
     clusterState.register({
       nodeId,
       totalCpu: input.cpuCores,
@@ -114,19 +115,20 @@ export const nodesService = {
   },
 
   async heartbeat(input: HeartbeatNodeInput) {
-    const node = await prisma.node.findUnique({
-      where: { id: input.nodeId },
-      select: {
-        id: true,
-        allocatableCpu: true,
-        allocatableMemoryMb: true,
-        totalCpu: true,
-        totalMemoryMb: true,
-      },
-    });
+    const node = await instrumentedQuery("SELECT", "nodes", "scheduler-service", () =>
+      prisma.node.findUnique({
+        where: { id: input.nodeId },
+        select: {
+          id: true,
+          allocatableCpu: true,
+          allocatableMemoryMb: true,
+          totalCpu: true,
+          totalMemoryMb: true,
+        },
+      }),
+    );
 
     if (!node) {
-      // Keep behavior aligned with existing consumer: ignore unknown nodes.
       logger.warn({ nodeId: input.nodeId }, "HTTP heartbeat for unknown node");
       return;
     }
@@ -136,15 +138,16 @@ export const nodesService = {
     const usedCpu = Math.max(0, totalCpu - input.availableCpu);
     const usedMemoryMb = Math.max(0, totalMemoryMb - input.availableMemoryMB);
 
-    await prisma.node.update({
-      where: { id: input.nodeId },
-      data: {
-        lastHeartbeatAt: new Date(),
-        status: "HEALTHY",
-      },
-    });
+    await instrumentedQuery("UPDATE", "nodes", "scheduler-service", () =>
+      prisma.node.update({
+        where: { id: input.nodeId },
+        data: {
+          lastHeartbeatAt: new Date(),
+          status: "HEALTHY",
+        },
+      }),
+    );
 
     clusterState.heartbeat(input.nodeId, usedCpu, usedMemoryMb);
   },
 };
-

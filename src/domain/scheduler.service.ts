@@ -2,7 +2,9 @@ import { clusterState } from "./cluster.state";
 import { leastAllocatedFit } from "./placement.algorithm";
 import { publishJobScheduled } from "../producers/scheduler.events";
 import { prisma } from "@/config/db";
-import { logger } from "../libs/logger";
+import { getLogger, schedulingLatency, instrumentedQuery } from "@computebay/observability";
+
+const logger = getLogger();
 
 /** Ensures only one job runs "getEligible + reserve" at a time so we don't over-assign the same node. */
 let schedulingLock: Promise<void> = Promise.resolve();
@@ -17,6 +19,7 @@ export interface JobCreatedEvent {
 export async function scheduleJob(event: JobCreatedEvent) {
   const release = await acquireSchedulingLock();
   const { jobId, resources } = event;
+  const startTime = Date.now();
 
   try {
     const eligible = clusterState.getEligible(
@@ -32,13 +35,15 @@ export async function scheduleJob(event: JobCreatedEvent) {
     const selected = leastAllocatedFit(eligible);
 
     if (!selected) {
-      await prisma.schedulingAudit.create({
-        data: {
-          jobId,
-          nodeId: "",
-          decision: "REJECTED_NO_CAPACITY",
-        },
-      });
+      await instrumentedQuery("INSERT", "scheduling_audit", "scheduler-service", () =>
+        prisma.schedulingAudit.create({
+          data: {
+            jobId,
+            nodeId: "",
+            decision: "REJECTED_NO_CAPACITY",
+          },
+        }),
+      );
       logger.info({ jobId }, "Job rejected: no capacity");
       return;
     }
@@ -49,18 +54,23 @@ export async function scheduleJob(event: JobCreatedEvent) {
       event.resources.memoryMB,
     );
 
+    const schedulingDuration = (Date.now() - startTime) / 1000;
+    schedulingLatency.observe({ service: "scheduler-service" }, schedulingDuration);
+
     logger.info(
-      { jobId, nodeId: selected.nodeId },
+      { jobId, nodeId: selected.nodeId, scheduling_duration_ms: Date.now() - startTime },
       "Job scheduled",
     );
 
-    await prisma.schedulingAudit.create({
-      data: {
-        jobId,
-        nodeId: selected.nodeId,
-        decision: "SCHEDULED",
-      },
-    });
+    await instrumentedQuery("INSERT", "scheduling_audit", "scheduler-service", () =>
+      prisma.schedulingAudit.create({
+        data: {
+          jobId,
+          nodeId: selected.nodeId,
+          decision: "SCHEDULED",
+        },
+      }),
+    );
 
     await publishJobScheduled(event, selected.nodeId);
   } finally {

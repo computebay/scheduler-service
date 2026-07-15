@@ -1,6 +1,8 @@
 import { getChannel, initRabbit } from "@/config/rabbitmq";
 import { v4 as uuidv4 } from "uuid";
+import { getLogger } from "@computebay/observability";
 
+const logger = getLogger();
 const nodeId = uuidv4();
 
 export async function startFakeWorker() {
@@ -8,7 +10,6 @@ export async function startFakeWorker() {
 
   const channel = getChannel();
 
-  // Declare worker queue
   await channel.assertQueue(`worker.${nodeId}`, {
     durable: true,
   });
@@ -19,7 +20,6 @@ export async function startFakeWorker() {
     `job.scheduled.${nodeId}`,
   );
 
-  // 2️⃣ Register node
   const nodeData = {
     nodeId,
     orgId: "org-123",
@@ -29,7 +29,7 @@ export async function startFakeWorker() {
     totalMemoryMb: 8192,
   };
 
-  console.log("Publishing node registration:", nodeData);
+  logger.info({ nodeData }, "Publishing node registration");
 
   channel.publish(
     "compute-bay.jobs",
@@ -38,25 +38,25 @@ export async function startFakeWorker() {
     { persistent: true },
   );
 
-  console.log("Fake worker registered with nodeId:", nodeId);
+  logger.info({ nodeId }, "Fake worker registered");
 
-  // 🆕 Send periodic heartbeats
+  // Send periodic heartbeats
   setInterval(() => {
     channel.publish(
       "compute-bay.jobs",
       "node.heartbeat",
-      Buffer.from(JSON.stringify({ nodeId })), // ← Make sure to include nodeId
+      Buffer.from(JSON.stringify({ nodeId })),
       { persistent: true },
     );
-    console.log("Heartbeat sent for node:", nodeId);
-  }, 30000); // Every 30 seconds
+    logger.debug({ nodeId }, "Heartbeat sent");
+  }, 30000);
 
-  // 3️⃣ Consume assigned jobs
+  // Consume assigned jobs
   channel.consume(`worker.${nodeId}`, async (msg) => {
     if (!msg) return;
 
     const data = JSON.parse(msg.content.toString());
-    console.log("Received job:", data.jobId);
+    logger.info({ jobId: data.jobId }, "Received job");
 
     // Simulate execution delay
     setTimeout(() => {
@@ -81,10 +81,12 @@ export async function startFakeWorker() {
         );
 
         channel.ack(msg);
-        console.log("Job completed:", data.jobId);
+        logger.info({ jobId: data.jobId }, "Job completed");
       }, 2000);
     }, 1000);
   });
 }
 
-startFakeWorker().catch(console.error);
+startFakeWorker().catch((err) => {
+  logger.fatal({ err }, "Fake worker failed");
+});

@@ -2,12 +2,14 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
-import { logger } from "../libs/logger";
+import { getLogger } from "@computebay/observability";
+
+const logger = getLogger();
 
 // Create connection pool
 const pool = new Pool({
   connectionString: Bun.env.DATABASE_URL,
-  max: 20, // Maximum pool size
+  max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
 });
@@ -18,7 +20,6 @@ const adapter = new PrismaPg(pool);
 // Create Prisma client with adapter
 export const prisma = new PrismaClient({
   adapter,
-  // log: ['query', 'info', 'warn', 'error'],
 });
 
 logger.info("Prisma client instantiated with pg adapter");

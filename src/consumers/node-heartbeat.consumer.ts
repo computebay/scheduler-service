@@ -1,12 +1,10 @@
 import { clusterState } from "../domain/cluster.state";
-import { logger } from "../libs/logger";
+import { getLogger, instrumentedQuery } from "@computebay/observability";
 import { prisma } from "@/config/db";
 import { verifyWorkerMessage } from "../security/signature.verify";
 
-/**
- * Process node.heartbeat.
- * Verifies signature with stored publicKey, then updates heartbeat and cluster state.
- */
+const logger = getLogger();
+
 export async function processNodeHeartbeat(
   data: Record<string, unknown>,
 ): Promise<void> {
@@ -19,10 +17,12 @@ export async function processNodeHeartbeat(
     return;
   }
 
-  const node = await prisma.node.findUnique({
-    where: { id: nodeId },
-    select: { publicKey: true },
-  });
+  const node = await instrumentedQuery("SELECT", "nodes", "scheduler-service", () =>
+    prisma.node.findUnique({
+      where: { id: nodeId },
+      select: { publicKey: true },
+    }),
+  );
 
   if (!node) {
     logger.warn({ nodeId }, "node.heartbeat: node not in DB – skipping");
@@ -35,13 +35,15 @@ export async function processNodeHeartbeat(
     if (!valid) return;
   }
 
-  await prisma.node.update({
-    where: { id: nodeId },
-    data: {
-      lastHeartbeatAt: new Date(),
-      status: "HEALTHY",
-    },
-  });
+  await instrumentedQuery("UPDATE", "nodes", "scheduler-service", () =>
+    prisma.node.update({
+      where: { id: nodeId },
+      data: {
+        lastHeartbeatAt: new Date(),
+        status: "HEALTHY",
+      },
+    }),
+  );
 
   clusterState.heartbeat(
     nodeId,

@@ -1,13 +1,10 @@
 import { clusterState } from "../domain/cluster.state";
 import { prisma } from "@/config/db";
-import { logger } from "../libs/logger";
+import { getLogger, instrumentedQuery } from "@computebay/observability";
 import { verifyWorkerMessageWithProvidedKey } from "../security/signature.verify";
 
-/**
- * Process node.registration.requested or node.registered.
- * Verifies signature, stores publicKey, registers node and adds to cluster immediately.
- * No approval step – automatic registration.
- */
+const logger = getLogger();
+
 export async function processNodeRegistered(
   data: Record<string, unknown>,
 ): Promise<void> {
@@ -47,35 +44,39 @@ export async function processNodeRegistered(
     }
   }
 
-  const existing = await prisma.node.findUnique({ where: { id: nodeId }, select: { publicKey: true } });
+  const existing = await instrumentedQuery("SELECT", "nodes", "scheduler-service", () =>
+    prisma.node.findUnique({ where: { id: nodeId }, select: { publicKey: true } }),
+  );
   const publicKeyToStore = existing?.publicKey ?? publicKey ?? null;
 
-  await prisma.node.upsert({
-    where: { id: nodeId },
-    update: {
-      totalCpu,
-      totalMemoryMb,
-      allocatableCpu,
-      allocatableMemoryMb,
-      lastHeartbeatAt: new Date(),
-      status: "REGISTERED",
-      publicKey: publicKeyToStore,
-      updatedAt: new Date(),
-    },
-    create: {
-      id: nodeId,
-      orgId,
-      name,
-      region: (data.region as string) ?? null,
-      totalCpu,
-      totalMemoryMb,
-      allocatableCpu,
-      allocatableMemoryMb,
-      publicKey: publicKeyToStore,
-      status: "REGISTERED",
-      lastHeartbeatAt: new Date(),
-    },
-  });
+  await instrumentedQuery("UPSERT", "nodes", "scheduler-service", () =>
+    prisma.node.upsert({
+      where: { id: nodeId },
+      update: {
+        totalCpu,
+        totalMemoryMb,
+        allocatableCpu,
+        allocatableMemoryMb,
+        lastHeartbeatAt: new Date(),
+        status: "REGISTERED",
+        publicKey: publicKeyToStore,
+        updatedAt: new Date(),
+      },
+      create: {
+        id: nodeId,
+        orgId,
+        name,
+        region: (data.region as string) ?? null,
+        totalCpu,
+        totalMemoryMb,
+        allocatableCpu,
+        allocatableMemoryMb,
+        publicKey: publicKeyToStore,
+        status: "REGISTERED",
+        lastHeartbeatAt: new Date(),
+      },
+    }),
+  );
 
   clusterState.register({
     nodeId,

@@ -1,6 +1,8 @@
 import { prisma } from "@/config/db";
 import { clusterState } from "@/domain/cluster.state";
-import { logger } from "@/libs/logger";
+import { getLogger, instrumentedQuery } from "@computebay/observability";
+
+const logger = getLogger();
 
 const HEARTBEAT_TIMEOUT_MS = parseInt(
   process.env.HEARTBEAT_TIMEOUT_MS || "90000",
@@ -11,26 +13,26 @@ const CHECK_INTERVAL_MS = parseInt(
   10,
 );
 
-/**
- * Marks nodes as UNHEALTHY if lastHeartbeatAt is older than threshold.
- * Runs on an interval.
- */
 async function checkNodeHealth(): Promise<void> {
   try {
     const cutoff = new Date(Date.now() - HEARTBEAT_TIMEOUT_MS);
-    const stale = await prisma.node.findMany({
-      where: {
-        status: { in: ["REGISTERED", "HEALTHY"] },
-        OR: [{ lastHeartbeatAt: { lt: cutoff } }, { lastHeartbeatAt: null }],
-      },
-      select: { id: true },
-    });
+    const stale = await instrumentedQuery("SELECT", "nodes", "scheduler-service", () =>
+      prisma.node.findMany({
+        where: {
+          status: { in: ["REGISTERED", "HEALTHY"] },
+          OR: [{ lastHeartbeatAt: { lt: cutoff } }, { lastHeartbeatAt: null }],
+        },
+        select: { id: true },
+      }),
+    );
 
     for (const node of stale) {
-      await prisma.node.update({
-        where: { id: node.id },
-        data: { status: "UNHEALTHY" },
-      });
+      await instrumentedQuery("UPDATE", "nodes", "scheduler-service", () =>
+        prisma.node.update({
+          where: { id: node.id },
+          data: { status: "UNHEALTHY" },
+        }),
+      );
       clusterState.markUnhealthy(node.id);
       logger.info({ nodeId: node.id }, "Node marked UNHEALTHY (heartbeat timeout)");
     }

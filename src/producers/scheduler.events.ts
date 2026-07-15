@@ -1,5 +1,8 @@
 import { getChannel } from "../config/rabbitmq";
 import type { JobCreatedEvent } from "../domain/scheduler.service";
+import { instrumentedSendToQueue, instrumentedPublish, getLogger } from "@computebay/observability";
+
+const logger = getLogger();
 
 /** Forwards full job payload so the worker has jobType, runtime, entrypoint, inputArtifacts, etc. */
 export async function publishJobScheduled(event: JobCreatedEvent, nodeId: string) {
@@ -13,11 +16,10 @@ export async function publishJobScheduled(event: JobCreatedEvent, nodeId: string
 
   const queue = `queue.node.${nodeId}`;
   await channel.assertQueue(queue, { durable: true });
-  channel.sendToQueue(
-    queue,
-    Buffer.from(JSON.stringify(payload)),
-    { persistent: true },
-  );
+
+  instrumentedSendToQueue(channel, queue, Buffer.from(JSON.stringify(payload)), "scheduler-service", {
+    persistent: true,
+  });
 }
 
 export interface NodeRegisteredEvent {
@@ -42,10 +44,9 @@ export async function publishNodeRegistered(event: NodeRegisteredEvent) {
     registeredAt: Date.now(),
   };
 
-  channel.publish(
-    "compute-bay.jobs",
-    "node.registered",
-    Buffer.from(JSON.stringify(payload)),
-    { persistent: true },
-  );
+  instrumentedPublish(channel, {
+    exchange: "compute-bay.jobs",
+    routingKey: "node.registered",
+    service: "scheduler-service",
+  }, Buffer.from(JSON.stringify(payload)));
 }

@@ -1,6 +1,8 @@
 import crypto from "node:crypto";
 import { prisma } from "@/config/db";
-import { logger } from "@/libs/logger";
+import { getLogger, instrumentedQuery } from "@computebay/observability";
+
+const logger = getLogger();
 
 function buildVerifiablePayload(payload: Record<string, unknown>): string {
   const { signature: _sig, ...rest } = payload;
@@ -38,7 +40,6 @@ function verifySignature(
   }
 }
 
-/** Verifies signature using stored publicKey. */
 export async function verifyWorkerMessage(
   nodeId: string,
   payload: Record<string, unknown>,
@@ -49,10 +50,12 @@ export async function verifyWorkerMessage(
     return false;
   }
 
-  const node = await prisma.node.findUnique({
-    where: { id: nodeId },
-    select: { publicKey: true },
-  });
+  const node = await instrumentedQuery("SELECT", "nodes", "scheduler-service", () =>
+    prisma.node.findUnique({
+      where: { id: nodeId },
+      select: { publicKey: true },
+    }),
+  );
 
   if (!node?.publicKey) {
     logger.warn({ nodeId }, "Node not found or missing publicKey – rejecting");
@@ -68,7 +71,6 @@ export async function verifyWorkerMessage(
   return true;
 }
 
-/** Verifies signature using provided publicKey (for registration). */
 export async function verifyWorkerMessageWithProvidedKey(
   nodeId: string,
   payload: Record<string, unknown>,

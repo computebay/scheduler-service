@@ -1,10 +1,12 @@
 import amqp from "amqplib";
-import { logger } from "@/libs/logger";
+import { getLogger } from "@computebay/observability";
+
+const logger = getLogger();
 let channel: amqp.Channel;
 
 export async function initRabbit() {
   logger.info("Connecting to RabbitMQ");
-  const conn = await amqp.connect(Bun.env.RABBITMQ_URL!);
+  const conn = await amqp.connect(process.env.RABBITMQ_URL!);
   channel = await conn.createChannel();
 
   await channel.assertExchange("compute-bay.jobs", "topic", {

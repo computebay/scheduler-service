@@ -18,6 +18,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@computebay/observability": "file:../packages/observability",
     "@prisma/adapter-pg": "^7.4.0",
     "@prisma/client": "^7.4.2",
     "@types/amqplib": "^0.10.8",
