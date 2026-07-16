@@ -1,5 +1,5 @@
 {
-  "name": "auth-service",
+  "name": "scheduler-service",
   "module": "index.ts",
   "type": "module",
   "private": true,
