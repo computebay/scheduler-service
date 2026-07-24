@@ -37,3 +37,6 @@ npm-debug.log*
 .prisma
 .env
 /src/generated/prisma
+
+# Docker
+docker-compose.yml
