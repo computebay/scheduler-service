@@ -63,6 +63,8 @@ export const nodesService = {
     const eventsExchange = `node.${nodeId}.events`;
     const channel = getChannel();
     await channel.assertQueue(queue, { durable: true });
+    // Priority stop lane — declared here (admin creds); workers only read it.
+    await channel.assertQueue(`${queue}.cancel`, { durable: true });
     await channel.assertExchange(eventsExchange, "topic", { durable: true });
 
     // Per-node broker credentials
@@ -74,7 +76,7 @@ export const nodesService = {
     await setRabbitMqPermissions(username, env.rabbitmq.vhost || "/", {
       configure: "",
       write: `^(node\\.events|node\\.${nodeId}\\.events)$`,
-      read: `^queue\\.node\\.${nodeId}$`,
+      read: `^queue\\.node\\.${nodeId}(\\.cancel)?$`,
     });
 
     // Make node schedulable immediately
