@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/config/db";
 import { env } from "@/config/env";
 import { getChannel } from "@/config/rabbitmq";
@@ -7,6 +8,7 @@ import { setRabbitMqPermissions, upsertRabbitMqUser } from "@/integrations/rabbi
 import { randomBytes } from "node:crypto";
 import { v4 as uuidv4 } from "uuid";
 import { publishNodeRegistered } from "@/producers/scheduler.events";
+import { summarizeGpus, type GpuInfo } from "@/utils/gpu";
 
 const logger = getLogger();
 
@@ -15,13 +17,26 @@ type RegisterNodeInput = {
   cpuCores: number;
   memoryMB: number;
   agentVersion: string;
+  gpus?: GpuInfo[];
 };
 
 type HeartbeatNodeInput = {
   nodeId: string;
   availableCpu: number;
   availableMemoryMB: number;
+  gpus?: GpuInfo[];
 };
+
+/** Shape written to the GPU columns on the Node row. */
+function gpuColumns(gpus?: GpuInfo[]) {
+  const gpu = summarizeGpus(gpus);
+  return {
+    ...gpu,
+    gpuSpecs: gpu.gpuSpecs
+      ? (gpu.gpuSpecs as unknown as Prisma.InputJsonValue)
+      : Prisma.DbNull,
+  };
+}
 
 function generatePassword(): string {
   return randomBytes(32).toString("base64url");
@@ -40,6 +55,8 @@ function buildScopedAmqpUrl(username: string, password: string): string {
 export const nodesService = {
   async register(input: RegisterNodeInput) {
     const nodeId = uuidv4();
+    const gpu = summarizeGpus(input.gpus);
+    const gpuData = gpuColumns(input.gpus);
 
     await instrumentedQuery("INSERT", "nodes", "scheduler-service", () =>
       prisma.node.create({
@@ -54,6 +71,7 @@ export const nodesService = {
           totalMemoryMb: input.memoryMB,
           allocatableCpu: input.cpuCores,
           allocatableMemoryMb: input.memoryMB,
+          ...gpuData,
           lastHeartbeatAt: new Date(),
         },
       }),
@@ -88,9 +106,29 @@ export const nodesService = {
       usedMemoryMb: 0,
       healthy: true,
       lastHeartbeat: Date.now(),
+      gpuAvailable: gpu.gpuAvailable,
+      gpuCount: gpu.gpuCount,
+      gpuName: gpu.gpuName,
+      gpuMemoryMb: gpu.gpuMemoryMb,
+      gpuDriverVersion: gpu.gpuDriverVersion,
+      gpuSpecs: gpu.gpuSpecs ?? null,
+      gpuMetadataComplete: gpu.gpuMetadataComplete,
+      gpuExecutionReady: gpu.gpuExecutionReady,
     });
 
-    logger.info({ nodeId, machineId: input.machineId }, "Registered node via HTTP");
+    logger.info(
+      {
+        nodeId,
+        machineId: input.machineId,
+        gpuAvailable: gpu.gpuAvailable,
+        gpuCount: gpu.gpuCount,
+        gpuName: gpu.gpuName,
+        gpuMemoryMb: gpu.gpuMemoryMb,
+        gpuMetadataComplete: gpu.gpuMetadataComplete,
+        gpuExecutionReady: gpu.gpuExecutionReady,
+      },
+      "Registered node via HTTP"
+    );
 
     // Notify internal consumers (e.g. job-service) that a new node is available.
     await publishNodeRegistered({
@@ -101,6 +139,7 @@ export const nodesService = {
       totalMemoryMb: input.memoryMB,
       allocatableCpu: input.cpuCores,
       allocatableMemoryMb: input.memoryMB,
+      ...gpu,
       queue,
       publishExchange: "node.events",
       eventsExchange,
@@ -140,16 +179,25 @@ export const nodesService = {
     const usedCpu = Math.max(0, totalCpu - input.availableCpu);
     const usedMemoryMb = Math.max(0, totalMemoryMb - input.availableMemoryMB);
 
+    // Older workers omit `gpus`; leave stored GPU data untouched for them.
+    const gpuData = input.gpus !== undefined ? gpuColumns(input.gpus) : {};
+
     await instrumentedQuery("UPDATE", "nodes", "scheduler-service", () =>
       prisma.node.update({
         where: { id: input.nodeId },
         data: {
           lastHeartbeatAt: new Date(),
           status: "HEALTHY",
+          ...gpuData,
         },
       }),
     );
 
     clusterState.heartbeat(input.nodeId, usedCpu, usedMemoryMb);
+
+    if (input.gpus !== undefined) {
+      const gpu = summarizeGpus(input.gpus);
+      clusterState.updateGpuInfo(input.nodeId, gpu);
+    }
   },
 };

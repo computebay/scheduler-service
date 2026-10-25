@@ -23,6 +23,16 @@ model Node {
   allocatableCpu      Int?       // From registration; used for scheduling
   allocatableMemoryMb Int?
 
+  // GPU discovery (reported by the worker at registration/heartbeats)
+  gpuAvailable        Boolean    @default(false) // Hardware detected; not an execution-readiness claim
+  gpuName             String?    // Name of the first detected GPU (e.g. "NVIDIA A100")
+  gpuCount            Int        @default(0)
+  gpuMemoryMb         Int?       // Total VRAM across all detected GPUs, in MiB; null if any value is unknown
+  gpuDriverVersion    String?
+  gpuSpecs            Json?      // Full per-GPU details: [{ index, vendor, name, memoryMb, pciAddress, ... }]
+  gpuMetadataComplete Boolean    @default(false) // Model, VRAM and driver known for every GPU
+  gpuExecutionReady   Boolean    @default(false) // An execution backend has been verified
+
   createdAt           DateTime   @default(now())
   updatedAt           DateTime   @updatedAt
   lastHeartbeatAt     DateTime?
@@ -32,6 +42,7 @@ model Node {
   @@index([orgId])
   @@index([status])
   @@index([machineId])
+  @@index([gpuAvailable])
   @@schema("scheduler")
 }
 

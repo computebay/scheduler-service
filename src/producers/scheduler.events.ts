@@ -1,5 +1,6 @@
 import { getChannel } from "../config/rabbitmq";
 import type { JobCreatedEvent } from "../domain/scheduler.service";
+import type { GpuSummary } from "../utils/gpu";
 import { instrumentedSendToQueue, instrumentedPublish, getLogger } from "@computebay/observability";
 
 const logger = getLogger();
@@ -22,7 +23,7 @@ export async function publishJobScheduled(event: JobCreatedEvent, nodeId: string
   });
 }
 
-export interface NodeRegisteredEvent {
+export interface NodeRegisteredEvent extends GpuSummary {
   nodeId: string;
   machineId: string;
   agentVersion: string;

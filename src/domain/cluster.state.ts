@@ -1,3 +1,5 @@
+import type { GpuInfo, GpuSummary } from "@/utils/gpu";
+
 export interface NodeState {
   nodeId: string;
   totalCpu: number;
@@ -6,6 +8,14 @@ export interface NodeState {
   usedMemoryMb: number;
   healthy: boolean;
   lastHeartbeat: number;
+  gpuAvailable: boolean;
+  gpuCount: number;
+  gpuName: string | null;
+  gpuMemoryMb: number | null;
+  gpuDriverVersion: string | null;
+  gpuSpecs: GpuInfo[] | null;
+  gpuMetadataComplete: boolean;
+  gpuExecutionReady: boolean;
 }
 
 class ClusterState {
@@ -28,6 +38,20 @@ class ClusterState {
   markUnhealthy(nodeId: string) {
     const node = this.nodes.get(nodeId);
     if (node) node.healthy = false;
+  }
+
+  updateGpuInfo(nodeId: string, gpu: GpuSummary) {
+    const node = this.nodes.get(nodeId);
+    if (!node) return;
+
+    node.gpuAvailable = gpu.gpuAvailable;
+    node.gpuCount = gpu.gpuCount;
+    node.gpuName = gpu.gpuName;
+    node.gpuMemoryMb = gpu.gpuMemoryMb;
+    node.gpuDriverVersion = gpu.gpuDriverVersion;
+    node.gpuSpecs = gpu.gpuSpecs ?? null;
+    node.gpuMetadataComplete = gpu.gpuMetadataComplete;
+    node.gpuExecutionReady = gpu.gpuExecutionReady;
   }
 
   getEligible(cpu: number, memory: number): NodeState[] {
