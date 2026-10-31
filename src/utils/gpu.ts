@@ -36,8 +36,8 @@ export interface GpuSummary {
   /** True when every detected GPU has a known model, VRAM and driver. */
   gpuMetadataComplete: boolean;
   /**
-   * True only when every detected device advertises at least one verified
-   * execution backend. Detection alone never sets this.
+   * True when at least one detected device advertises a verified execution
+   * backend. Unsupported display adapters must not hide usable GPUs.
    */
   gpuExecutionReady: boolean;
 }
@@ -85,11 +85,12 @@ export function summarizeGpus(gpus: GpuInfo[] = []): GpuSummary {
     gpuDriverVersion: gpus.find(hasDriverVersion)?.driverVersion ?? null,
     gpuSpecs: gpus.length > 0 ? gpus : undefined,
     gpuMetadataComplete: metadataComplete,
-    // Readiness requires a verified backend on every device. A GPU that was
-    // only detected (or whose backend list is empty) must not be scheduled.
+    // Readiness is a fleet-level convenience flag. Scheduling still matches
+    // individual devices using their backend lists, so unsupported AMD/Intel
+    // display adapters must not make a usable NVIDIA device disappear.
     gpuExecutionReady:
       gpus.length > 0 &&
-      gpus.every(
+      gpus.some(
         (gpu) =>
           Array.isArray(gpu.executionBackends) &&
           gpu.executionBackends.length > 0

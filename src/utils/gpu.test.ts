@@ -92,6 +92,29 @@ describe("summarizeGpus", () => {
     assert.equal(summary.gpuMetadataComplete, false);
   });
 
+  test("keeps execution ready when a supported GPU is mixed with an unsupported adapter", () => {
+    const summary = summarizeGpus([
+      {
+        index: 0,
+        vendor: "NVIDIA",
+        name: "GeForce RTX 3050 Laptop GPU",
+        memoryMb: 4096,
+        driverVersion: "610.57.04",
+        executionBackends: ["cuda", "nvenc"],
+      },
+      {
+        index: 1,
+        vendor: "AMD",
+        pciVendorId: "1002",
+        executionBackends: [],
+      },
+    ]);
+
+    assert.equal(summary.gpuAvailable, true);
+    assert.equal(summary.gpuExecutionReady, true);
+    assert.equal(summary.gpuMetadataComplete, false);
+  });
+
   test("remains compatible with legacy workers that always send name and memory", () => {
     const summary = summarizeGpus([
       {
