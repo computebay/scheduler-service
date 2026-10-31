@@ -1,4 +1,5 @@
 import type { GpuInfo, GpuSummary } from "@/utils/gpu";
+import type { GpuAllocationRecord } from "./gpu.types";
 
 export interface NodeState {
   nodeId: string;
@@ -21,6 +22,11 @@ export interface NodeState {
 class ClusterState {
   private nodes = new Map<string, NodeState>();
 
+  /** Active whole-GPU allocations, keyed by jobId. */
+  private gpuAllocations = new Map<string, GpuAllocationRecord>();
+  /** Reserved device keys per node, derived from gpuAllocations. */
+  private reservedGpuKeys = new Map<string, Set<string>>();
+
   register(node: NodeState) {
     this.nodes.set(node.nodeId, node);
   }
@@ -35,9 +41,17 @@ class ClusterState {
     node.healthy = true;
   }
 
-  markUnhealthy(nodeId: string) {
+  markUnhealthy(nodeId: string): GpuAllocationRecord[] {
     const node = this.nodes.get(nodeId);
     if (node) node.healthy = false;
+
+    // A node that stopped heartbeating can no longer be trusted to run (or
+    // later release) its GPU jobs, so drop local reservations immediately.
+    return this.releaseGpuAllocationsForNode(nodeId);
+  }
+
+  isHealthy(nodeId: string): boolean {
+    return this.nodes.get(nodeId)?.healthy === true;
   }
 
   updateGpuInfo(nodeId: string, gpu: GpuSummary) {
@@ -77,6 +91,91 @@ class ClusterState {
 
     node.usedCpu = Math.max(0, node.usedCpu - cpu);
     node.usedMemoryMb = Math.max(0, node.usedMemoryMb - memory);
+  }
+
+  getGpuAllocation(jobId: string): GpuAllocationRecord | undefined {
+    return this.gpuAllocations.get(jobId);
+  }
+
+  listGpuAllocations(): GpuAllocationRecord[] {
+    return [...this.gpuAllocations.values()];
+  }
+
+  /** Device keys already reserved on a node (for matcher input). */
+  getReservedGpuKeys(nodeId: string): ReadonlySet<string> {
+    return this.reservedGpuKeys.get(nodeId) ?? new Set<string>();
+  }
+
+  /** Current GPU inventory of a node (used by allocation hydration). */
+  getGpuSpecs(nodeId: string): GpuInfo[] | null {
+    return this.nodes.get(nodeId)?.gpuSpecs ?? null;
+  }
+
+  /**
+   * Record an active allocation. Idempotent for duplicate scheduling
+   * redeliveries of the same job.
+   */
+  reserveGpuAllocation(allocation: GpuAllocationRecord): void {
+    const existing = this.gpuAllocations.get(allocation.jobId);
+    if (existing) {
+      if (
+        existing.nodeId === allocation.nodeId &&
+        existing.deviceKeys.length === allocation.deviceKeys.length &&
+        existing.deviceKeys.every((key) =>
+          allocation.deviceKeys.includes(key)
+        )
+      ) {
+        return;
+      }
+      this.releaseGpuAllocation(allocation.jobId);
+    }
+
+    // Safety net: no device key may be held by two allocations at once.
+    for (const [jobId, held] of [...this.gpuAllocations.entries()]) {
+      if (
+        held.deviceKeys.some((key) => allocation.deviceKeys.includes(key))
+      ) {
+        this.releaseGpuAllocation(jobId);
+      }
+    }
+
+    this.gpuAllocations.set(allocation.jobId, allocation);
+    let keys = this.reservedGpuKeys.get(allocation.nodeId);
+    if (!keys) {
+      keys = new Set<string>();
+      this.reservedGpuKeys.set(allocation.nodeId, keys);
+    }
+    for (const key of allocation.deviceKeys) {
+      keys.add(key);
+    }
+  }
+
+  releaseGpuAllocation(jobId: string): GpuAllocationRecord | undefined {
+    const allocation = this.gpuAllocations.get(jobId);
+    if (!allocation) return undefined;
+
+    this.gpuAllocations.delete(jobId);
+    const keys = this.reservedGpuKeys.get(allocation.nodeId);
+    if (keys) {
+      for (const key of allocation.deviceKeys) {
+        keys.delete(key);
+      }
+      if (keys.size === 0) {
+        this.reservedGpuKeys.delete(allocation.nodeId);
+      }
+    }
+    return allocation;
+  }
+
+  releaseGpuAllocationsForNode(nodeId: string): GpuAllocationRecord[] {
+    const released: GpuAllocationRecord[] = [];
+    for (const allocation of [...this.gpuAllocations.values()]) {
+      if (allocation.nodeId === nodeId) {
+        const removed = this.releaseGpuAllocation(allocation.jobId);
+        if (removed) released.push(removed);
+      }
+    }
+    return released;
   }
 
   /** Number of nodes currently in memory (for debugging / startup hydration). */

@@ -8,6 +8,7 @@ import { setRabbitMqPermissions, upsertRabbitMqUser } from "@/integrations/rabbi
 import { randomBytes } from "node:crypto";
 import { v4 as uuidv4 } from "uuid";
 import { publishNodeRegistered } from "@/producers/scheduler.events";
+import { releaseGpuAllocationsForNode } from "@/domain/gpu.release";
 import { summarizeGpus, type GpuInfo } from "@/utils/gpu";
 
 const logger = getLogger();
@@ -198,6 +199,20 @@ export const nodesService = {
     if (input.gpus !== undefined) {
       const gpu = summarizeGpus(input.gpus);
       clusterState.updateGpuInfo(input.nodeId, gpu);
+
+      // A worker that no longer advertises ANY verified execution backend
+      // (driver removed, toolkit uninstalled, Docker down) cannot run its
+      // assigned GPU jobs. Mixed nodes with at least one executable device
+      // keep their allocations — matching is done per device.
+      const anyExecutableBackend = input.gpus.some(
+        (device) => (device.executionBackends?.length ?? 0) > 0,
+      );
+      if (!anyExecutableBackend) {
+        await releaseGpuAllocationsForNode(
+          input.nodeId,
+          "gpu_execution_no_longer_ready",
+        );
+      }
     }
   },
 };

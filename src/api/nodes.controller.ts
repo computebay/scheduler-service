@@ -15,6 +15,9 @@ const gpuSchema = z.object({
   pciDeviceId: z.string().min(1).optional(),
   pciAddress: z.string().min(1).optional(),
   discoverySource: z.string().min(1).optional(),
+  // Verified Docker execution backends (e.g. ["cuda","nvenc"]). Optional so
+  // older workers that never probe execution readiness remain compatible.
+  executionBackends: z.array(z.string().min(1)).max(16).optional(),
 });
 
 const registerSchema = z.object({

@@ -1,16 +1,22 @@
 import { getChannel } from "../config/rabbitmq";
 import type { JobCreatedEvent } from "../domain/scheduler.service";
 import type { GpuSummary } from "../utils/gpu";
-import { instrumentedSendToQueue, instrumentedPublish, getLogger } from "@computebay/observability";
-
-const logger = getLogger();
+import type { GpuAssignment } from "../domain/gpu.types";
+import { instrumentedSendToQueue, instrumentedPublish } from "@computebay/observability";
 
 /** Forwards full job payload so the worker has jobType, runtime, entrypoint, inputArtifacts, etc. */
-export async function publishJobScheduled(event: JobCreatedEvent, nodeId: string) {
+export async function publishJobScheduled(
+  event: JobCreatedEvent,
+  nodeId: string,
+  gpuAssignment?: GpuAssignment,
+) {
   const channel = getChannel();
 
   const payload = {
     ...event,
+    // Only GPU-required jobs carry an assignment; workers must fail fast (not
+    // downgrade to CPU) when their assignment is missing.
+    ...(gpuAssignment ? { gpuAssignment } : {}),
     nodeId,
     scheduledAt: Date.now(),
   };

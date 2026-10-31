@@ -17,6 +17,11 @@ export interface GpuInfo {
   pciDeviceId?: string;
   pciAddress?: string;
   discoverySource?: string;
+  /**
+   * Execution backends verified for this device by the worker's Docker/NVIDIA
+   * probe. Absent or empty means discovery succeeded but execution did not.
+   */
+  executionBackends?: string[];
 }
 
 export interface GpuSummary {
@@ -31,8 +36,8 @@ export interface GpuSummary {
   /** True when every detected GPU has a known model, VRAM and driver. */
   gpuMetadataComplete: boolean;
   /**
-   * True only after an execution backend has been verified for these devices.
-   * Detection alone never sets this; no readiness probe runs in this task.
+   * True only when every detected device advertises at least one verified
+   * execution backend. Detection alone never sets this.
    */
   gpuExecutionReady: boolean;
 }
@@ -80,8 +85,14 @@ export function summarizeGpus(gpus: GpuInfo[] = []): GpuSummary {
     gpuDriverVersion: gpus.find(hasDriverVersion)?.driverVersion ?? null,
     gpuSpecs: gpus.length > 0 ? gpus : undefined,
     gpuMetadataComplete: metadataComplete,
-    // Detection is not execution readiness. A future readiness probe may set
-    // this, but discovery alone must never advertise a usable backend.
-    gpuExecutionReady: false,
+    // Readiness requires a verified backend on every device. A GPU that was
+    // only detected (or whose backend list is empty) must not be scheduled.
+    gpuExecutionReady:
+      gpus.length > 0 &&
+      gpus.every(
+        (gpu) =>
+          Array.isArray(gpu.executionBackends) &&
+          gpu.executionBackends.length > 0
+      ),
   };
 }

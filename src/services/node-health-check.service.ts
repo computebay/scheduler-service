@@ -1,5 +1,6 @@
 import { prisma } from "@/config/db";
 import { clusterState } from "@/domain/cluster.state";
+import { releaseGpuAllocationsForNode } from "@/domain/gpu.release";
 import { getLogger, instrumentedQuery } from "@computebay/observability";
 
 const logger = getLogger();
@@ -35,6 +36,7 @@ async function checkNodeHealth(): Promise<void> {
       );
       clusterState.markUnhealthy(node.id);
       logger.info({ nodeId: node.id }, "Node marked UNHEALTHY (heartbeat timeout)");
+      await releaseGpuAllocationsForNode(node.id, "node_heartbeat_timeout");
     }
   } catch (err) {
     logger.error({ err }, "Node health check failed");

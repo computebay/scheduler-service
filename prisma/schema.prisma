@@ -72,12 +72,42 @@ model SchedulingAudit {
   @@schema("scheduler")
 }
 
+/// Whole-GPU allocations. Only one ACTIVE allocation may exist per job.
+/// Persisted so scheduler restarts and node failures can reconcile devices.
+model GpuAllocation {
+  id            String              @id @default(uuid())
+  jobId         String              @unique
+  nodeId        String
+  vendor        String
+  backend       String
+  count         Int
+  /// Selected devices: [{ id?, index, vendor, pciAddress? }]
+  devices       Json
+  /// Stable device keys used for exclusivity, e.g. ["id:GPU-..."].
+  deviceKeys    Json
+  status        GpuAllocationStatus @default(ACTIVE)
+  createdAt     DateTime            @default(now())
+  releasedAt    DateTime?
+  releaseReason String?
+
+  @@index([nodeId])
+  @@index([status])
+  @@schema("scheduler")
+}
+
 enum NodeStatus {
   REGISTERED
   HEALTHY
   UNHEALTHY
   DRAINING
   OFFLINE
+
+  @@schema("scheduler")
+}
+
+enum GpuAllocationStatus {
+  ACTIVE
+  RELEASED
 
   @@schema("scheduler")
 }
